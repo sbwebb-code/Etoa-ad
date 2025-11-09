@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Car Ad Builder – East Tennessee Auto Outlet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Open+Sans&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --orange:#ff6a00;
+      --dark:#111;
+      --light:#fff;
+    }
+    body{
+      margin:0;font-family:'Open Sans',sans-serif;background:#f4f4f4;color:#333;
+      display:flex;flex-direction:column;align-items:center;padding:20px;
+    }
+    h1{margin:0 0 20px;font-family:'Montserrat',sans-serif;color:var(--orange);}
+    .container{max-width:1100px;width:100%;display:grid;gap:20px;grid-template-columns:1fr 1fr;}
+    .form{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
+    .form label{display:block;margin-top:12px;font-weight:600;}
+    .form input,.form textarea{width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;}
+    .form button{margin-top:20px;background:var(--orange);color:#fff;padding:10px 16px;border:none;border-radius:4px;cursor:pointer;}
+    .form button:hover{background:#e55a00;}
+    .preview{position:relative;overflow:hidden;background:#222;border-radius:8px;}
+    #canvas{display:block;max-width:100%;height:auto;}
+    .size-btn{margin-top:10px;padding:6px 12px;background:#555;color:#fff;border:none;border-radius:4px;cursor:pointer;}
+    .size-btn.active{background:var(--orange);}
+    .caption-output{margin-top:20px;padding:15px;background:#fff;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1);white-space:pre-wrap;}
+    @media(max-width:900px){.container{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+  <h1>Car Ad Builder</h1>
+
+  <div class="container">
+    <!-- LEFT – FORM -->
+    <div class="form">
+      <label>Car Photo</label>
+      <input type="file" id="photo" accept="image/*">
+
+      <label>Year / Make / Model</label>
+      <input type="text" id="title" placeholder="2019 KIA STINGER" value="2019 KIA STINGER">
+
+      <label>Trim & Specs (one line)</label>
+      <input type="text" id="specs" placeholder="GT2 SEDAN 4D • V6, TWIN TURBO, 3.3 LITER • RWD • AUTOMATIC" value="GT2 SEDAN 4D • V6, TWIN TURBO, 3.3 LITER • RWD • AUTOMATIC">
+
+      <label>Price</label>
+      <input type="text" id="price" placeholder="$27,500" value="$27,500">
+
+      <label>Stock #</label>
+      <input type="text" id="stock" placeholder="K63742" value="K63742">
+
+      <label>VIN</label>
+      <input type="text" id="vin" placeholder="KNAE55LC6K0637442" value="KNAE55LC6K0637442">
+
+      <label>Mileage</label>
+      <input type="text" id="miles" placeholder="68,231 miles" value="68,231 miles">
+
+      <label>MPG</label>
+      <input type="text" id="mpg" placeholder="City 19/Hwy 25 MPG" value="City 19/Hwy 25 MPG">
+
+      <label>Phone</label>
+      <input type="text" id="phone" placeholder="(423) 435-2177" value="(423) 435-2177">
+
+      <label>Address</label>
+      <input type="text" id="address" placeholder="Athens Lot – 4 Green Street, Athens, TN 37303" value="Athens Lot – 4 Green Street, Athens, TN 37303">
+
+      <label>Hashtags (comma separated)</label>
+      <input type="text" id="hashtags" placeholder="#KiaStinger #ChristmasDeals ..." value="#KiaStinger #StingerGT2 #TwinTurbo #SportSedan #ChristmasDeals #KiaForSale #LuxuryCar #RWD #athenstn">
+
+      <button id="render">Render Preview</button>
+
+      <div style="margin-top:15px;">
+        <button class="size-btn active" data-ratio="16:9">16:9 (Facebook)</button>
+        <button class="size-btn" data-ratio="1:1">1:1 (Instagram)</button>
+      </div>
+
+      <button id="download" style="margin-top:10px;" disabled>Download Image</button>
+    </div>
+
+    <!-- RIGHT – PREVIEW -->
+    <div class="preview">
+      <canvas id="canvas"></canvas>
+      <div style="padding:10px;text-align:center;">
+        <button id="copyShort">Copy Short Caption</button>
+        <button id="copyLong" style="margin-left:8px;">Copy Long Caption</button>
+      </div>
+      <div class="caption-output" id="captionOut"></div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- CONFIG ----------
+    const FESTIVE_TOP = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSI499...' // (shortened – full SVG below)
+    const LOGO = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjcwIiB2aWV3Qm94PSIwIDAgMjAwIDcwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPj...' // (full SVG below)
+
+    // ---------- ELEMENTS ----------
+    const els = {
+      photo: document.getElementById('photo'),
+      title: document.getElementById('title'),
+      specs: document.getElementById('specs'),
+      price: document.getElementById('price'),
+      stock: document.getElementById('stock'),
+      vin: document.getElementById('vin'),
+      miles: document.getElementById('miles'),
+      mpg: document.getElementById('mpg'),
+      phone: document.getElementById('phone'),
+      address: document.getElementById('address'),
+      hashtags: document.getElementById('hashtags'),
+      canvas: document.getElementById('canvas'),
+      renderBtn: document.getElementById('render'),
+      downloadBtn: document.getElementById('download'),
+      sizeBtns: document.querySelectorAll('.size-btn'),
+      copyShort: document.getElementById('copyShort'),
+      copyLong: document.getElementById('copyLong'),
+      captionOut: document.getElementById('captionOut')
+    };
+
+    let ratio = '16:9'; // default
+    let finalBlob = null;
+
+    // ---------- RATIO SWITCH ----------
+    els.sizeBtns.forEach(b => b.addEventListener('click', () => {
+      els.sizeBtns.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      ratio = b.dataset.ratio;
+      render(); // re-draw with new ratio
+    }));
+
+    // ---------- CANVAS SETUP ----------
+    const ctx = els.canvas.getContext('2d');
+    let img = new Image();
+
+    els.photo.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      img.onload = () => { render(); };
+      img.src = url;
+    });
+
+    els.renderBtn.addEventListener('click', render);
+    els.downloadBtn.addEventListener('click', () => {
+      if (!finalBlob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(finalBlob);
+      a.download = `${els.stock.value.replace(/[^a-z0-9]/gi,'_')}_${ratio.replace(':','x')}.png`;
+      a.click();
+    });
+
+    // ---------- RENDER ----------
+    function render() {
+      if (!img.src) return alert('Upload a photo first');
+
+      const [wMult, hMult] = ratio === '16:9' ? [16,9] : [1,1];
+      const canvasW = 1200;
+      const canvasH = Math.round(canvasW * hMult / wMult);
+      els.canvas.width = canvasW;
+      els.canvas.height = canvasH;
+      els.canvas.style.width = '100%';
+      els.canvas.style.height = 'auto';
+
+      // background image (cover)
+      const imgRatio = img.naturalWidth / img.naturalHeight;
+      const canvasRatio = canvasW / canvasH;
+      let drawW, drawH, offsetX=0, offsetY=0;
+      if (imgRatio > canvasRatio) { // image wider
+        drawH = canvasH; drawW = drawH * imgRatio;
+        offsetX = (canvasW - drawW)/2;
+      } else {
+        drawW = canvasW; drawH = drawW / imgRatio;
+        offsetY = (canvasH - drawH)/2;
+      }
+      ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+
+      // Dark overlay for text contrast
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0,0,canvasW,canvasH);
+
+      // ---- FESTIVE TOP BAR ----
+      const topH = canvasH * 0.14;
+      ctx.fillStyle = '#ff6a00';
+      ctx.fillRect(0,0,canvasW,topH);
+
+      // lights SVG (embedded base64 – see full code at end)
+      const lights = new Image();
+      lights.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxcHgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHBhdGggZD0iTTAgMGgxMDAwVjFIMHoiIGZpbGw9IiNmZmYiLz4KPC9zdmc+'; // placeholder – replace with full SVG
+      // (full lights SVG is in the final file)
+
+      // Title
+      ctx.font = `bold ${topH*0.28}px Montserrat, sans-serif`;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(els.title.value.toUpperCase(), canvasW/2, topH*0.58);
+
+      // Specs
+      ctx.font = `${topH*0.18}px Open Sans, sans-serif`;
+      ctx.fillText(els.specs.value.toUpperCase(), canvasW/2, topH*0.88);
+
+      // ---- PRICE BOX ----
+      const priceBoxH = canvasH * 0.12;
+      const priceBoxW = canvasW * 0.22;
+      ctx.fillStyle = '#ff6a00';
+      ctx.fillRect(canvasW - priceBoxW - 30, canvasH - priceBoxH - 30, priceBoxW, priceBoxH);
+      ctx.font = `bold ${priceBoxH*0.55}px Montserrat, sans-serif`;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(els.price.value, canvasW - priceBoxW/2 - 30, canvasH - priceBoxH*0.28 - 30);
+
+      // ---- BOTTOM BAR ----
+      const bottomH = canvasH * 0.09;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, canvasH - bottomH, canvasW, bottomH);
+
+      // LOGO
+      const logoImg = new Image();
+      logoImg.src = LOGO;
+      logoImg.onload = () => {
+        const logoH = bottomH * 0.7;
+        const logoW = logoImg.naturalWidth * logoH / logoImg.naturalHeight;
+        ctx.drawImage(logoImg, 20, canvasH - bottomH + (bottomH-logoH)/2, logoW, logoH);
+        drawBottomText();
+      };
+      if (logoImg.complete) logoImg.onload();
+
+      function drawBottomText() {
+        ctx.fillStyle = '#fff';
+        ctx.font = `${bottomH*0.22}px Open Sans, sans-serif`;
+        ctx.textAlign = 'left';
+        const txt = `Stock #${els.stock.value} • VIN ${els.vin.value} • ${els.miles.value} • ${els.mpg.value}`;
+        ctx.fillText(txt, 20 + 150, canvasH - bottomH*0.38);
+
+        ctx.font = `${bottomH*0.28}px Montserrat, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText(`Text/Call ${els.phone.value} • ${els.address.value}`, canvasW - 20, canvasH - bottomH*0.38);
+        // done
+        els.canvas.toBlob(b => { finalBlob = b; els.downloadBtn.disabled = false; },'image/png');
+        generateCaptions();
+      }
+    }
+
+    // ---------- CAPTION ----------
+    function generateCaptions() {
+      const tags = els.hashtags.value.split(',').map(t=>t.trim()).join(' ');
+      const shortCap = `🎄 ${els.title.value} ${els.price.value}\n${els.specs.value}\n${els.miles.value} • ${els.mpg.value}\n📞 ${els.phone.value}\n${tags}`;
+      const longCap = `Forget boring gifts! This Christmas, get behind the wheel of a true sport sedan.\n\n` +
+        `${els.title.value} delivers thrilling performance thanks to its 3.3L Twin Turbo V6 and luxurious features. It's the ultimate upgrade for your holiday commute.\n\n` +
+        `${els.price.value}\n\n` +
+        `GT2 Trim (Top of the line!)\n` +
+        `V6, Twin Turbo, 3.3 Liter\n` +
+        `Low Mileage: ${els.miles.value.split(' ')[0]}\n` +
+        `RWD Power\n` +
+        `${els.mpg.value}\n\n` +
+        `Drive different. Drive better. Drive a Stinger.\n\n` +
+        `Call/Text ${els.phone.value} ${els.address.value}\n` +
+        `${tags}`;
+
+      els.captionOut.textContent = `SHORT (copy button above):\n${shortCap}\n\nLONG:\n${longCap}`;
+
+      els.copyShort.onclick = () => {copyToClipboard(shortCap); alert('Short caption copied!');};
+      els.copyLong.onclick = () => {copyToClipboard(longCap); alert('Long caption copied!');};
+    }
+
+    function copyToClipboard(str){
+      const ta = document.createElement('textarea');
+      ta.value = str; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+
+    // ---------- FULL SVG DATA (paste into the constants above) ----------
+    // FESTIVE LIGHTS (top orange bar)
+    const FULL_LIGHTS_SVG = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjIwcHgiPjxkZWZzPjxwYXR0ZXJuIGlkPSJsaWdodHMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTTAgMTBjMCA1LTQtMTAtMTAtMTB2MjB6TTIwIDEwYzAgNS00LTEwLTEwLTEwdjIwek0zMCAxMGMwIDUtNC0xMC0xMC0xMHYyMHpNNDAgMTBjMCA1LTQtMTAtMTAtMTB2MjB6TTUwIDEwYzAgNS00LTEwLTEwLTEwdjIwek02MCAxMGMwIDUtNC0xMC0xMC0xMHYyMHoiIGZpbGw9IiNmZmYiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjIwIiBmaWxsPSJ1cmwoI2xpZ2h0cykiLz48L3N2Zz4=`;
+    // LOGO (East Tennessee Auto Outlet)
+    const FULL_LOGO_SVG = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjcwIiB2aWV3Qm94PSIwIDAgMjAwIDcwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxtYXNrIGlkPSJsb2dvTWFzayI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2ZmZiIvPjwvbWFzaz48ZyBtYXNrPSJ1cmwoI2xvZ29NYXNrKSI+PHBhdGggZD0iTTEwIDM1LjVjMCAxMi4xIDkuOSAycmVhY3QgeCAyMGMwIDEyLjEtOS45IDIyLTE5LjkgMjJIMzBjLTkuOSAwLTE5LjktOS45LTE5LjktMjJWMjBjMC0xMi4xIDkuOS0yMiAxOS45LTIySDcwYzkuOSAwIDE5LjkgOS45IDE5LjkgMjJ2MTUuNXoiIGZpbGw9IiNmZjZhMDAiLz48dGV4dCB4PSIzNSIgeT0iNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCxTYW5zIiBmb250LXNpemU9IjI0IiBmaWxsPSJ3aGl0ZSI+RUFTVDwvdGV4dD48dGV4dCB4PSIxMDUiIHk9IjQ1IiBmb250LWZhbWlseT0iQXJpYWwsU2FucyIgZm9udC1zaXplPSIyNCIgZmlsbD0id2hpdGUiPlRFTk5FU1NFRTwvdGV4dD48dGV4dCB4PSI3MCIgeT0iNjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxTYW5zIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSI+QVVTVE8gT1VUTEVUPC90ZXh0PjwvZz48L3N2Zz4=`;
+
+    // replace placeholders
+    Object.assign(window, {FULL_LIGHTS_SVG, FULL_LOGO_SVG});
+    // (in production just paste the full strings into the const declarations at top)
+
+  </script>
+</body>
+</html>
